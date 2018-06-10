@@ -11,7 +11,7 @@ pnum    "print-num"
 pbool   "print-bool"
 print   {pnum}|{pbool}
 %%
-[ \t]+    {}
+[ \t\n]+    {}
 mod       {return MOD;}
 and       {return AND;}
 or        {return OR;}

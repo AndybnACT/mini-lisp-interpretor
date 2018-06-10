@@ -22,6 +22,7 @@
     void symscopeassign(struct symbol_table *, struct astnode *);
     void symexprbinding(struct astnode *, struct symbol_table **);
     struct symbol_table* symlistcopy(struct symbol_table *);
+    struct symbol_table *NESTED_FUNC=NULL;
 %}
 
 %union{
@@ -59,20 +60,21 @@
 %%
 // program
 prog    :   stmt{
-            printf("prog-->stmt\n");
+            fprintf(stderr,"prog-->stmt\n");
         }
         |   prog stmt{
-            printf("prog-->prog stmt\n");
+            fprintf(stderr,"prog-->prog stmt\n");
         }
         ;
 stmt    :   expr{
-            printf("stmt-->expr\n");
+            fprintf(stderr,"stmt-->expr\n");
+            asttreval($<nodeptr>1);
         }
         |   print_stmt{
-            printf("stmt-->print\n");
+            fprintf(stderr,"stmt-->print\n");
         }
         |   def_stmt{
-            printf("stmt-->def\n");
+            fprintf(stderr,"stmt-->def\n");
         }
         ;
 
@@ -87,135 +89,116 @@ def_stmt    :   '(' DEF ID expr ')'{
 
 // prints
 print_stmt  :  '(' PRINT expr ')'{
-                printf("print-stmt\n");
+                fprintf(stderr,"print-stmt\n");
                 struct nodecontent *result;
                 result = asttreval($<nodeptr>3);
                 if (result->t == BOOLEAN && $<n>2.t == PBOOL) {
                     char *tf[2] = {"#f", "#t"};
-                    printf("result = %s\n", tf[result->val]);
+                    printf("%s\n", tf[result->val]);
                 }else if (result->t == NUMBER && $<n>2.t == PNUM) {
-                    printf("result = %d\n",result->val );
+                    printf("%d\n",result->val );
                 }else{
-                    printf("type mismatch for print and expr\n");
-                    printf("%d type=%d\n", result->val, result->t);
-                    printf("%p %p %p\n",$<nodeptr>3, $<nodeptr>3->left, $<nodeptr>3->right );
+                    fprintf(stderr,"type mismatch for print and expr\n");
+                    fprintf(stderr,"%d type=%d\n", result->val, result->t);
+                    fprintf(stderr,"%p %p %p\n",$<nodeptr>3, $<nodeptr>3->left, $<nodeptr>3->right );
                 }
             }
             ;
 // expressions
 expr    :   BOOL {
-            printf("expr-->bool\n");
+            fprintf(stderr,"expr-->bool\n");
             $<nodeptr>$ = astleaf(&($<n>1));
-            //printf("%p\n", $<nodeptr>$);
+            //fprintf(stderr,"%p\n", $<nodeptr>$);
         }
         |   NUM{
-            printf("expr-->number\n");
+            fprintf(stderr,"expr-->number\n");
             $<nodeptr>$ = astleaf(&($<n>1));
-            printf("%p\n", $<nodeptr>$);
+            fprintf(stderr,"%p\n", $<nodeptr>$);
         }
         |   ID {
-            printf("expr-->ID\n");
-            // struct symbol_table *symcur = symscope;
-            // if (symfind(&symcur, $<n>1.name) == 0) {
-            //     printf("unknown variable\n");
-            // }else{
-            //     $<nodeptr>$ = symcur->expr;
-            // }
+            fprintf(stderr,"expr-->ID\n");
             $<nodeptr>$ = astleaf(&($<n>1));
-            printf("%p\n", $<nodeptr>$);
+            fprintf(stderr,"%p\n", $<nodeptr>$);
         }
         |   num_op {
-            printf("expr-->numerical_op\n");
+            fprintf(stderr,"expr-->numerical_op\n");
             $<nodeptr>$ = $<nodeptr>1;
-            printf("%p\n", $<nodeptr>$);
+            fprintf(stderr,"%p\n", $<nodeptr>$);
         }
         |   logical_op{
-            printf("expr-->logical_op\n");
+            fprintf(stderr,"expr-->logical_op\n");
             $<nodeptr>$ = $<nodeptr>1;
         }
         |   if_expr{
-            printf("expr-->if_expr\n");
+            fprintf(stderr,"expr-->if_expr\n");
             $<nodeptr>$ = $<nodeptr>1;
         }
         |   func_call{
-            printf("expr-->func_call\n");
+            fprintf(stderr,"expr-->func_call\n");
         }
         ;
 exprs   :   expr {
-            printf("exprs-->expr\n");
+            fprintf(stderr,"exprs-->expr\n");
             $<nodeptr>$ = $<nodeptr>1;
         }
         |   exprs expr{
-            printf("exprs-->exprs expr\n");
+            fprintf(stderr,"exprs-->exprs expr\n");
             $<nodeptr>$ = astparent(CATEXP, $<nodeptr>1, $<nodeptr>2);
         }
         ;
 // calculator
 num_op  :   '(' '+' expr exprs ')'{
-            printf("plus\n");
+            fprintf(stderr,"plus\n");
             $<nodeptr>$ = astparent(OPPLUS, $<nodeptr>3, $<nodeptr>4);
-            printf("%p %p %p\n", $<nodeptr>$, $<nodeptr>3, $<nodeptr>4);
+            fprintf(stderr,"%p %p %p\n", $<nodeptr>$, $<nodeptr>3, $<nodeptr>4);
         }
         |   '(' '-' expr expr ')'{
-            printf("minus\n");
+            fprintf(stderr,"minus\n");
             $<nodeptr>$ = astparent(OPMINUS, $<nodeptr>3, $<nodeptr>4);
         }
         |   '(' '*' expr exprs ')'{
-            printf("mul\n");
+            fprintf(stderr,"mul\n");
             $<nodeptr>$ = astparent(OPMUL, $<nodeptr>3, $<nodeptr>4);
         }
         |   '(' '/' expr expr ')'{
-            printf("divide\n");
+            fprintf(stderr,"divide\n");
             $<nodeptr>$ = astparent(OPDIVD, $<nodeptr>3, $<nodeptr>4);
         }
         |   '(' MOD expr expr ')'{
-            printf("mod\n");
+            fprintf(stderr,"mod\n");
             $<nodeptr>$ = astparent(OPMOD, $<nodeptr>3, $<nodeptr>4);
         }
         |   '(' '>' expr expr ')'{
-            printf("greater\n");
+            fprintf(stderr,"greater\n");
             $<nodeptr>$ = astparent(OPGT, $<nodeptr>3, $<nodeptr>4);
         }
         |   '(' '<' expr expr ')'{
-            printf("less\n");
+            fprintf(stderr,"less\n");
             $<nodeptr>$ = astparent(OPLT, $<nodeptr>3, $<nodeptr>4);
         }
         |   '(' '=' expr expr ')'{
-            printf("equal\n");
+            fprintf(stderr,"equal\n");
             $<nodeptr>$ = astparent(OPEQ, $<nodeptr>3, $<nodeptr>4);
         }
         ;
 logical_op  :   '(' AND expr exprs ')'{
-                printf("and\n");
+                fprintf(stderr,"and\n");
                 $<nodeptr>$ = astparent(OPAND, $<nodeptr>3, $<nodeptr>4);
             }
             |   '('  OR expr exprs ')'{
-                printf("or\n");
+                fprintf(stderr,"or\n");
                 $<nodeptr>$ = astparent(OPOR, $<nodeptr>3, $<nodeptr>4);
             }
             |   '(' NOT expr ')'{
-                printf("not\n");
+                fprintf(stderr,"not\n");
                 $<nodeptr>$ = astparent(OPNOT, NULL, $<nodeptr>3);
             }
             ;
 // if-then-else
-if_expr :   '(' IF expr expr expr ')'{ //NOTE bind into asttreval to support function calls
+if_expr :   '(' IF expr expr expr ')'{
             struct astnode *selection;
             selection = astparent(IFBODY, $<nodeptr>4, $<nodeptr>5);
             $<nodeptr>$ = astparent(IFHEAD, $<nodeptr>3, selection);
-            // struct nodecontent *testexp, *thenexp, *elseexp;
-            // testexp = asttreval($<nodeptr>3);
-            // if (testexp->t == BOOLEAN) {
-            //     // thenexp = asttreval($<nodeptr>4);
-            //     // elseexp = asttreval($<nodeptr>5);
-            //     if (testexp->val == 1)
-            //         $<nodeptr>$ = $<nodeptr>4;
-            //     else
-            //         $<nodeptr>$ = $<nodeptr>5;
-            //
-            // }else{
-            //     printf("test expression of if-then-else must be BOOLEAN\n");
-            // }
 
         }
         ;
@@ -223,44 +206,55 @@ if_expr :   '(' IF expr expr expr ')'{ //NOTE bind into asttreval to support fun
 
 func_call   :   '(' inline_func param ')'{ //--->bind expr to corresponding symbol tabal
                 struct symbol_table *paramlist = symlistcopy($<nodeptr>2->scopehead);
-                printf("func_call-->inline_func param\n");
+                fprintf(stderr,"func_call-->inline_func param\n");
                 // struct symbol_table *tmphead =  $<nodeptr>2->scopehead;
-                printf("%p\n",paramlist );
+                fprintf(stderr,"%p\n",paramlist );
                 if (paramlist) { // if the function takes at least one variable(s)
-                    printf("[variable->ast]\n");
+                    fprintf(stderr,"[variable->ast]\n");
                     symscopeassign(paramlist ,$<nodeptr>2);
-                    printf("[expr->variable->ast]\n");
+                    fprintf(stderr,"[expr->variable->ast]\n");
                     symexprbinding($<nodeptr>3 , &(paramlist));
                 }
                 $<nodeptr>$ = $<nodeptr>2;
 
             }
             |   '(' ID param ')'{
-                printf("func_call-->id param\n");
+                fprintf(stderr,"func_call-->id param\n");
 
                 struct symbol_table *findfunc = symhead, *paramlist;
                 struct astnode *found;
                 if (symfind(&findfunc, $<n>2.name)){
                     found = findfunc->expr;
                     paramlist = symlistcopy(found->scopehead);
-                    printf("%p\n",&found );
+                    fprintf(stderr,"%p\n",&found );
                     if (paramlist) { // if the function takes at least one variable(s)
-                        printf("[variable->ast]\n");
+                        fprintf(stderr,"[variable->ast]\n");
                         symscopeassign(paramlist ,found);
-                        printf("[expr->variable->ast]\n");
+                        found->scope_cur = paramlist;
+                        fprintf(stderr,"[expr->variable->ast]\n");
                         symexprbinding($<nodeptr>3 , &(paramlist));
                     }
                     $<nodeptr>$ = found;
                 }else{
-                    printf("error function not found\n");
+                    fprintf(stderr,"function not found\n");
+                    fprintf(stderr, "creating function symbol to be resolved at runtime\n");
+                    struct astnode *unsolved = (struct astnode *)malloc(sizeof(struct astnode));
+                    unsolved->t = UNSOVED_FUNC;
+                    unsolved->name = $<n>2.name;
+                    unsolved->left = NULL;
+                    unsolved->right =  $<nodeptr>3;;
+                    unsolved->scopehead = NULL;
+                    unsolved->scope_cur = NULL;
+                    $<nodeptr>$ = unsolved;
                 }
 
             }
             ;
 inline_func :   '(' FUNC '(' func_ids ')' func_body ')'{
-                printf("inline_func\n");
+                fprintf(stderr,"inline_func\n");
                 $<nodeptr>6->scopehead = $<symlist>4;
                 $<nodeptr>$ = $<nodeptr>6;
+
 
             }
             ;
@@ -268,33 +262,33 @@ func_body   :   expr{
                 $<nodeptr>$ = $<nodeptr>1;
             }
             |   '(' DEF ID inline_func ')' {
-                    printf("func_body--> def part\n");
+                    fprintf(stderr,"func_body--> def part\n");
                     SymCreate($<nodeptr>4->scopehead, $<n>3.name, $<nodeptr>4);
-                    struct symbol_table *lowest = symhead;
-                    for (; lowest; lowest=lowest->below);
-                    lowest = $<nodeptr>4->scopehead;
+                    NESTED_FUNC = $<nodeptr>4->scopehead;
                 } expr {
-                    printf("func_body -->( DEF ID inline_func ) expr\n");
-
+                    fprintf(stderr,"func_body -->( DEF ID inline_func ) expr\n");
+                    $<nodeptr>$ = $<nodeptr>6;
+                    printf("%p\n",$<nodeptr>6);
+                    NESTED_FUNC = NULL;
 
             }
             ;
 //-->create symbol table
 func_ids    :  {
-                printf("func_ids-->null\n");
+                fprintf(stderr,"func_ids-->null\n");
                 $<symlist>$ = NULL;
             }
             |   ID{
-                printf("func_ids-->id\n");
+                fprintf(stderr,"func_ids-->id\n");
                 struct symbol_table *id;
                 id = (struct symbol_table *)malloc(sizeof(struct symbol_table));
                 id->next = NULL;
                 SymCreate(id, $<n>1.name, NULL);
                 $<symlist>$ = id;
-                printf("scope head %p\n", id );
+                fprintf(stderr,"scope head %p\n", id );
             }
             |   func_ids ID{
-                printf("func_ids-->func_ids id\n");
+                fprintf(stderr,"func_ids-->func_ids id\n");
                 SymCreate($<symlist>1, $<n>2.name, NULL);
                 $<symlist>$ = $<symlist>1;
 
@@ -302,15 +296,29 @@ func_ids    :  {
             ;
 param       :
             |   exprs{
-                printf("param-->exprs\n");
+                fprintf(stderr,"param-->exprs\n");
                 $<nodeptr>$ = $<nodeptr>1;
             }
             ;
 %%
+struct astnode* astcopy(struct astnode* root){
+    if (!root) return NULL;
+    struct astnode* cpy = (struct astnode*)malloc(sizeof(struct astnode));
+
+    cpy->t = root->t;
+    cpy->val = root->val;
+    cpy->name = root->name;
+    cpy->scopehead = root->scopehead;
+    cpy->scope_cur = root->scope_cur;
+    cpy->left = astcopy(root->left);
+    cpy->right = astcopy(root->right);
+    return cpy;
+}
+
 struct nodecontent* asttreval(struct astnode* root){
     struct nodecontent *ret;
     struct nodecontent *rchild, *lchild;
-    printf("start %p\n", root);
+    fprintf(stderr,"start %p\n", root);
     if (!root) return NULL; // 'not' case
     enum TYPE op = root->t;
     ret = (struct nodecontent *) malloc(sizeof(struct nodecontent));
@@ -319,26 +327,26 @@ struct nodecontent* asttreval(struct astnode* root){
     if (op == NUMBER || op == BOOLEAN) {
         ret->val = root->val;
         ret->t = root->t;
-        printf("operand--------->%d\n", ret->val);
+        fprintf(stderr,"operand--------->%d\n", ret->val);
         return ret;
     }else if (op == VARIABLE) {
-        printf("variable\n");
+        fprintf(stderr,"variable\n");
         struct symbol_table *symcur = root->scopehead == NULL ? symhead:root->scopehead;
-        printf("scopehead=%p\n", symcur);
+        fprintf(stderr,"scopehead=%p\n", symcur);
         if (symfind(&symcur, root->name) == 0) {
-            printf("unknown variable\n");
+            fprintf(stderr,"unknown variable\n");
             return ret;
         }else{
-            printf("variable found\n==>%s\n==>expr %p\n", symcur->sym, symcur->expr);
+            fprintf(stderr,"variable found\n==>%s\n==>expr %p\n", symcur->sym, symcur->expr);
             ret = asttreval(symcur->expr);
-            printf("variable value = %d, type = %d\n",ret->val, ret->t );
+            fprintf(stderr,"variable value = %d, type = %d\n",ret->val, ret->t );
             return ret;
         }
 
     }else if (op == IFHEAD) {
         ret = asttreval(root->left);
         if (ret->t == BOOLEAN) {
-            //printf("taken-->%p, not taken-->%p\n",root->right->left, root->right->right);
+            //fprintf(stderr,"taken-->%p, not taken-->%p\n",root->right->left, root->right->right);
             if (ret->val == 1) {
                 ret = asttreval(root->right->left);
             }else{
@@ -346,11 +354,43 @@ struct nodecontent* asttreval(struct astnode* root){
             }
             return ret;
         }else{
-            printf("test statement of if-then-else must be BOOLEAN\n");
+            fprintf(stderr,"test statement of if-then-else must be BOOLEAN\n");
             return ret;
         }
+    }else if (op == UNSOVED_FUNC) {
+        fprintf(stderr, "unsolved func: %s\n", root->name);
+        //findfunc
+        struct symbol_table *findfunc = symhead, *paramlist, *tmp;
+        struct astnode *foundast;
+        if (!symfind(&findfunc, root->name)) {
+            fprintf(stderr, "error function not found\n");
+            return ret;
+        }
+        // copy ast, symbols
+        foundast = astcopy(findfunc->expr);
+        paramlist = symlistcopy(foundast->scopehead);
+        fprintf(stderr, "%p paramlist\n", paramlist);
+        // assign symbols to param exprs
+        symscopeassign(foundast->scope_cur, root->right);
+        if (paramlist){
+            symscopeassign(paramlist, foundast);
+
+            tmp = findfunc->expr->scope_cur;
+            foundast->scope_cur = paramlist;
+            findfunc->expr->scope_cur = paramlist;
+            fprintf(stderr, "DEBUG\n");
+            fprintf(stderr, "----------->%p %s\n",paramlist->expr,paramlist->sym );
+            // ret = asttreval(paramlist->expr);
+            fprintf(stderr, "%d\n",ret->val );
+            // fprintf(stderr, "-------------------scope cur = %p\n",findfunc->expr );
+            fprintf(stderr, "DEBUG\n");
+            symexprbinding(root->right, &paramlist);
+        }
+        ret = asttreval(foundast);
+        findfunc->expr->scope_cur = tmp;
+        return ret;
     }else{
-        printf("operator========>%d\n", op);
+        fprintf(stderr,"operator========>%d\n", op);
         if (root->left && root->right) {
             if (root->left->t == CATEXP) root->left->t = op;
             if (root->right->t == CATEXP) root->right->t = op;
@@ -362,7 +402,8 @@ struct nodecontent* asttreval(struct astnode* root){
 
         }
         if (lchild->t != rchild->t) {
-            printf("type mismatch ltype=%d rtype=%d\n", lchild->t, rchild->t);
+            fprintf(stderr,"type mismatch ltype=%d rtype=%d\n", lchild->t, rchild->t);
+            fprintf(stdout, "Type error\n");
             return ret;
         }else if (lchild->t == NUMBER) {
             switch (op) {
@@ -399,7 +440,7 @@ struct nodecontent* asttreval(struct astnode* root){
                     ret->val = lchild->val == rchild->val ? 1:0;
                     break;
                 default:
-                    printf("wrong op type for numeric @%d line\n", __LINE__);
+                    fprintf(stderr,"wrong op type for numeric @%d line\n", __LINE__);
             }
         }else if (lchild->t == BOOLEAN) {
             ret->t = BOOLEAN;
@@ -414,12 +455,12 @@ struct nodecontent* asttreval(struct astnode* root){
                     ret->val = lchild->val == 1 ? 0:1;
                     break;
                 default:
-                    printf("wrong op type for boolean @%d line\n", __LINE__);
+                    fprintf(stderr,"wrong op type for boolean @%d line\n", __LINE__);
             }
         }else{
-            printf("unkown operand type @%d line\n", __LINE__);
+            fprintf(stderr,"unkown operand type @%d line\n", __LINE__);
         }
-        printf("result ====> %d, type=%d\n",ret->val, ret->t );
+        fprintf(stderr,"result ====> %d, type=%d\n",ret->val, ret->t );
         return ret;
     }
 }
@@ -452,7 +493,7 @@ int symfind(struct symbol_table **st, char *sym){
 void symcreate(struct symbol_table *cur, char *sym, struct astnode *expr){
     cur->next = (struct symbol_table *) malloc(sizeof(struct symbol_table));
     cur->next->next = NULL;
-    cur->below = NULL;
+    cur->parent = NULL;
     cur->sym = sym;
     cur->expr = expr;
 }
@@ -460,7 +501,7 @@ void symcreate(struct symbol_table *cur, char *sym, struct astnode *expr){
 void SymCreate(struct symbol_table *cur, char *sym, struct astnode *expr){
     struct symbol_table *symend = cur;
     if (symfind(&cur, sym)) {
-        printf("error redefinition of variable\n");
+        fprintf(stderr,"error redefinition of variable\n");
     }else{
         symcreate(cur, sym, expr);
     }
@@ -470,7 +511,7 @@ void symscopeassign(struct symbol_table *scopehead, struct astnode *funexpr){
     if (!funexpr) return;
     else if (funexpr->t == VARIABLE) {
         funexpr->scopehead = scopehead;
-        printf("assign %p to scopr %p\n", funexpr, scopehead);
+        fprintf(stderr,"assign %p to scopr %p\n", funexpr, scopehead);
         return;
     }
     symscopeassign(scopehead, funexpr->left);
@@ -481,9 +522,9 @@ void symexprbinding(struct astnode *exprs, struct symbol_table **scopehead) {
         symexprbinding(exprs->left, scopehead);
         symexprbinding(exprs->right, scopehead);
     }else{
-        printf("%p\n",(*scopehead) );
+        fprintf(stderr,"%p\n",(*scopehead) );
         if ((*scopehead) == NULL) {
-            printf("error number of param\n");
+            fprintf(stderr,"error number of param\n");
         }else{
             (*scopehead)->expr = exprs;
             (*scopehead) = (*scopehead)->next;
@@ -497,7 +538,9 @@ struct symbol_table* symlistcopy(struct symbol_table *source){
         copyto = dest;
         for (; source != NULL; source=source->next, copyto=copyto->next) {
             memcpy(copyto, source, sizeof(struct symbol_table));
+
             copyto->next = (struct symbol_table *) malloc(sizeof(struct symbol_table));
+            //printf("copiny %p to %p, %s\n",source, copyto, source->sym );
         }
         return dest;
     }else{
@@ -506,13 +549,13 @@ struct symbol_table* symlistcopy(struct symbol_table *source){
 }
 
 void yyerror(const char *msg) {
-    fprintf(stderr, "Syntax Error\n");
+    fprintf(stdout, "Syntax Error\n");
 }
 int main(int argc, char const *argv[]) {
     ROOT = (struct astnode *) malloc(sizeof(struct astnode));
     symhead = (struct symbol_table *) malloc(sizeof(struct symbol_table));
     symhead->next = NULL;
-    symhead->below = NULL;
+    symhead->parent = NULL;
     symscope = symhead;
 
     yyparse();
