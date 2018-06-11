@@ -3,7 +3,7 @@
     #include <stdio.h>
     #include <string.h>
     void yyerror(const char *);
-    struct astnode *ROOT;
+//    struct astnode *ROOT;
     struct astnode* astparent(enum TYPE, struct astnode*, struct astnode*);
     struct astnode* astleaf(struct nodecontent *);
     struct nodecontent* asttreval(struct astnode*);
@@ -22,7 +22,7 @@
     void symscopeassign(struct symbol_table *, struct astnode *);
     void symexprbinding(struct astnode *, struct symbol_table **);
     struct symbol_table* symlistcopy(struct symbol_table *);
-    struct symbol_table *NESTED_FUNC=NULL;
+    // struct symbol_table *NESTED_FUNC=NULL;
 %}
 
 %union{
@@ -263,13 +263,13 @@ func_body   :   expr{
             }
             |   '(' DEF ID inline_func ')' {
                     fprintf(stderr,"func_body--> def part\n");
-                    SymCreate($<nodeptr>4->scopehead, $<n>3.name, $<nodeptr>4);
-                    NESTED_FUNC = $<nodeptr>4->scopehead;
+                    // SymCreate($<nodeptr>4->scopehead, $<n>3.name, $<nodeptr>4);
+                    // NESTED_FUNC = $<nodeptr>4->scopehead;
                 } expr {
                     fprintf(stderr,"func_body -->( DEF ID inline_func ) expr\n");
-                    $<nodeptr>$ = $<nodeptr>6;
-                    printf("%p\n",$<nodeptr>6);
-                    NESTED_FUNC = NULL;
+                    // $<nodeptr>$ = $<nodeptr>6;
+                    // printf("%p\n",$<nodeptr>6);
+                    // NESTED_FUNC = NULL;
 
             }
             ;
@@ -302,6 +302,8 @@ param       :
             ;
 %%
 struct astnode* astcopy(struct astnode* root){
+    // return copy of the ast tree pointed by root
+    // used by dynamic(runtime) function calls (recursion)
     if (!root) return NULL;
     struct astnode* cpy = (struct astnode*)malloc(sizeof(struct astnode));
 
@@ -314,12 +316,49 @@ struct astnode* astcopy(struct astnode* root){
     cpy->right = astcopy(root->right);
     return cpy;
 }
-
 struct nodecontent* asttreval(struct astnode* root){
+    // evaluate the ast tree pointed by root and return the result
+    // returned nodecontent will be NONE type if error(s) occured
+    // executions will be determined by optype of root
+    // ==============[NUMBER || BOOLEAN]===========
+    // > return values set in root
+    // > we define val=1 for BOOLEAN's tree and val=0 for BOOLEAN's false
+    // > user should check 't' before using these types
+    // ==============[VARIABLE]============
+    // > return the evaluation of variable
+    // > user should assign VARIABLE to its scope(symhead)
+    // > and bind an expression(expr) to every VARIABLE's scope
+    // > before calling asttreval
+    // ==================[IFHEAD]==================
+    // > evaluate the 'test' expression and return the evaluation
+    // > of 'true-stmt'
+    // >          [IFHEAD]
+    // >         /.       \.
+    // >   <test expr>   [IFBODY]
+    // >                 /.      \.
+    // >            <#t expr>   <#f expr>
+    // ====================[UNSOVED_FUNC]=======================
+    // > Recursion
+    // > if the function is not binded at linktime (yacc's func_call CFG processing)
+    // > then the op type of the function will be UNSOVED_FUNC
+    // >          [UNSOVED_FUNC]
+    // >         /.             \.
+    // >       null            <param exprs>
+    // > When asttreval sees UNSOVED_FUNC, it then finds the function's expression
+    // > at the top level symbol table, copies the ast and prototype of its symbol table,
+    // > and binds the corresponding expressions to each symbol. Then return the
+    // > evaluation of the newly generated ast
+    // > BUG we save the scope of current function at scope_cur of the top level (symhead)
+    // >>>>> symbol table everytime we call UNSOVED_FUNC in order to evaluate the value
+    // >>>>> of parameters inside function
+    // > BUG the newly copied ast will not be freed after calling
+    // ================[OP*] [CATEXP]=================
+    // > checks the operand type and operate on it
+    // > copies the current operatoin if child's type == [CATEXP]
     struct nodecontent *ret;
     struct nodecontent *rchild, *lchild;
     fprintf(stderr,"start %p\n", root);
-    if (!root) return NULL; // 'not' case
+    if (!root) return NULL; // 'not' case (see 'not' case in 'logical_op')
     enum TYPE op = root->t;
     ret = (struct nodecontent *) malloc(sizeof(struct nodecontent));
     ret->t = NONE;
@@ -401,9 +440,13 @@ struct nodecontent* asttreval(struct astnode* root){
             lchild = rchild;
 
         }
+        if (lchild->t == NONE || rchild->t == NONE) {
+            fprintf(stderr, "asttreval returned NONE type, abort!!\n");
+            return ret;
+        }
         if (lchild->t != rchild->t) {
             fprintf(stderr,"type mismatch ltype=%d rtype=%d\n", lchild->t, rchild->t);
-            fprintf(stdout, "Type error\n");
+            fprintf(stdout, "Type error!\n");
             return ret;
         }else if (lchild->t == NUMBER) {
             switch (op) {
@@ -465,6 +508,8 @@ struct nodecontent* asttreval(struct astnode* root){
     }
 }
 struct astnode* astparent(enum TYPE op, struct astnode* left, struct astnode* right){
+    // generates a parent node with op type of input enum
+    // and links given childs to the parent
     struct astnode *parent;
     parent = (struct astnode *) malloc(sizeof(struct astnode));
     parent->t = op;
@@ -474,6 +519,7 @@ struct astnode* astparent(enum TYPE op, struct astnode* left, struct astnode* ri
     return parent;
 }
 struct astnode* astleaf(struct nodecontent *source){
+    // generates leaf node
     struct astnode *leaf;
     leaf = (struct astnode *) malloc(sizeof(struct astnode));
     leaf->t = source->t;
@@ -486,11 +532,16 @@ struct astnode* astleaf(struct nodecontent *source){
 }
 
 int symfind(struct symbol_table **st, char *sym){
+    // returns 1 if symbol is found
+    //         0              not found
+    // inputed st will be directed to the poninter points to found symbol
     for (; (*st)->next != NULL; (*st)=(*st)->next)
         if (strcmp(sym, (*st)->sym) == 0) return 1;
     return 0;
 }
 void symcreate(struct symbol_table *cur, char *sym, struct astnode *expr){
+    // creates symbol
+    // only used by SymCreate
     cur->next = (struct symbol_table *) malloc(sizeof(struct symbol_table));
     cur->next->next = NULL;
     cur->parent = NULL;
@@ -500,6 +551,7 @@ void symcreate(struct symbol_table *cur, char *sym, struct astnode *expr){
 
 void SymCreate(struct symbol_table *cur, char *sym, struct astnode *expr){
     struct symbol_table *symend = cur;
+    // creates symbol if the symbol is not found in the given scope
     if (symfind(&cur, sym)) {
         fprintf(stderr,"error redefinition of variable\n");
     }else{
@@ -508,6 +560,7 @@ void SymCreate(struct symbol_table *cur, char *sym, struct astnode *expr){
 }
 
 void symscopeassign(struct symbol_table *scopehead, struct astnode *funexpr){
+    // assign head of scope(symbol table) to every VARIABLE set in ast tree
     if (!funexpr) return;
     else if (funexpr->t == VARIABLE) {
         funexpr->scopehead = scopehead;
@@ -518,6 +571,13 @@ void symscopeassign(struct symbol_table *scopehead, struct astnode *funexpr){
     symscopeassign(scopehead, funexpr->right);
 }
 void symexprbinding(struct astnode *exprs, struct symbol_table **scopehead) {
+    //         [CATEXP]
+    //        /       \.
+    //    <expr>      <expr>
+    //      |            |
+    //  <symbol> +--> <symbol>
+    // parses the expression tree to each symbol in scopehead
+    // NOTE DO NOT USE scopehead AFTER this function
     if (exprs->t == CATEXP) {
         symexprbinding(exprs->left, scopehead);
         symexprbinding(exprs->right, scopehead);
@@ -532,6 +592,7 @@ void symexprbinding(struct astnode *exprs, struct symbol_table **scopehead) {
     }
 }
 struct symbol_table* symlistcopy(struct symbol_table *source){
+    // returns  the copied symbol table
     struct symbol_table *dest, *copyto;
     if (source) {
         dest = (struct symbol_table *)malloc(sizeof(struct symbol_table));
@@ -552,7 +613,7 @@ void yyerror(const char *msg) {
     fprintf(stdout, "Syntax Error\n");
 }
 int main(int argc, char const *argv[]) {
-    ROOT = (struct astnode *) malloc(sizeof(struct astnode));
+//    ROOT = (struct astnode *) malloc(sizeof(struct astnode));
     symhead = (struct symbol_table *) malloc(sizeof(struct symbol_table));
     symhead->next = NULL;
     symhead->parent = NULL;
